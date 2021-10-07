@@ -16,36 +16,77 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
 
+	"fmt"
+	"github.com/cavaliercoder/grab"	
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
+
+	log "github.com/sirupsen/logrus"
+	"net/url"
+	"os"
+	"strings"
 )
+
+var (
+	RootFSUrl string
+	BackupPath string
+)
+
+// copyyResource will download RootFSUrl and copy to BackupPath
+func copyResource(filename string) error {
+	_, err := grab.Get(fmt.Sprintf("%s/%s", BackupPath, filename), RootFSUrl)
+	if err != nil {
+		log.Error(err)
+		return err
+	} 
+	log.Info(fmt.Sprintf("Download completed for %s into %s/%s", RootFSUrl, BackupPath, filename))
+	return nil
+}
 
 // backupLiveImageCmd represents the backupLiveImage command
 var backupLiveImageCmd = &cobra.Command{
 	Use:   "backupLiveImage",
-	Short: "A brief description of your command",
+	Short: "It will read the rootfs url and will copy into given folder ",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
 
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("backupLiveImage called")
+
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// validate url
+		result, err := url.ParseRequestURI(RootFSUrl)
+		if err != nil {
+			log.Error(err)
+			return err	
+		}
+
+		path := result.Path
+		filename := path[strings.LastIndex(path, "/")+1:]
+		
+		// validate path
+		if _, err := os.Stat(BackupPath); os.IsNotExist(err) {
+			// path/to/whatever does not exist
+			log.Error(err)
+			return err
+		}
+
+		// start copying the resource
+		return copyResource(filename)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(backupLiveImageCmd)
 
-	// Here you will define your flags and configuration settings.
+	backupLiveImageCmd.Flags().StringVarP(&RootFSUrl, "rootFSURL", "u", "", "URL from where to download the live rootfs img")
+	backupLiveImageCmd.Flags().StringVarP(&BackupPath, "BackupPath", "p", "", "Path where to store the rootfs url")
+	backupLiveImageCmd.MarkFlagRequired("rootFSURL")
+	backupLiveImageCmd.MarkFlagRequired("BackupPath")
 
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// backupLiveImageCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// backupLiveImageCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// bind to viper
+	viper.BindPFlag("rootFSURL", backupLiveImageCmd.Flags().Lookup("rootFSURL"))
+	viper.BindPFlag("BackupPath", backupLiveImageCmd.Flags().Lookup("backupPath"))
 }
