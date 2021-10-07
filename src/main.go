@@ -15,7 +15,7 @@ limitations under the License.
 */
 package main
 
-import "github.com/redhat-ztp/openshift-ai-image-backup/cmd"
+import "github.com/redhat-ztp/openshift-ai-image-backup/src/cmd"
 
 func main() {
 	cmd.Execute()
