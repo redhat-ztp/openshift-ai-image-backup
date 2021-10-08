@@ -28,11 +28,18 @@ import (
 )
 
 // sync image with skopeo
-func syncImage(ReleaseImageURL string, BackupPath string) error {
+func syncImage(ReleaseImageURL string, BackupPath string, AuthFilePath string) error {
 	// first remove all content in that folder
 	os.RemoveAll(BackupPath)
 
-	_, err := exec.Command("/usr/bin/skopeo", "sync", "--src", "docker", "--dest", "dir", ReleaseImageURL, BackupPath).Output()
+	skopeoArgs := []string{"sync", "--src", "docker", "--dest", "dir", ReleaseImageURL, BackupPath}
+
+	if len(AuthFilePath) > 0 {
+		// add the authfile flag
+		skopeoArgs = append(skopeoArgs, []string{"--authfile", AuthFilePath}...)
+	}
+
+	_, err := exec.Command("/usr/bin/skopeo", skopeoArgs...).Output()
     if err != nil {
         log.Error(err)
 		return err
@@ -67,7 +74,11 @@ var backupReleaseImageCmd = &cobra.Command{
 		}
 
 		// start syncing image
-		return syncImage(ReleaseImageURL, BackupPath)
+		AuthFilePath := ""
+		if cmd.Flags().Changed("AuthFilePath") {
+			AuthFilePath, _ = cmd.Flags().GetString("AuthFilePath")
+		}
+		return syncImage(ReleaseImageURL, BackupPath, AuthFilePath)
 	},
 }
 
@@ -76,10 +87,12 @@ func init() {
 
 	backupReleaseImageCmd.Flags().StringP("ReleaseImageURL", "r", "", "URL for the release image to sync")
 	backupReleaseImageCmd.Flags().StringP("BackupPath", "p", "", "Path where to sync the release image")
+	backupReleaseImageCmd.Flags().StringP("AuthFilePath", "a", "", "Path to the registry authentication file")
 	backupReleaseImageCmd.MarkFlagRequired("ReleaseImageURL")
 	backupReleaseImageCmd.MarkFlagRequired("BackupPath")
 
 	// bind to viper
 	viper.BindPFlag("ReleaseImageURL", backupReleaseImageCmd.Flags().Lookup("ReleaseImageURL"))
 	viper.BindPFlag("BackupPath", backupReleaseImageCmd.Flags().Lookup("BackupPath"))
+	viper.BindPFlag("AuthFilePath", backupReleaseImageCmd.Flags().Lookup("AuthFilePath"))
 }
