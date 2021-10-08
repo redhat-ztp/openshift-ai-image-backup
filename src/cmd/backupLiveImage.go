@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+Copyright © 2021 Yolanda Robla <yroblamo@redhat.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -28,19 +28,16 @@ import (
 	"strings"
 )
 
-var (
-	RootFSUrl string
-	BackupPath string
-)
+func copyResource(RootFSURL string, BackupPath string, filename string) error {
+	// first remove all content in that folder
+	os.RemoveAll(BackupPath)
 
-// copyyResource will download RootFSUrl and copy to BackupPath
-func copyResource(filename string) error {
-	_, err := grab.Get(fmt.Sprintf("%s/%s", BackupPath, filename), RootFSUrl)
+	_, err := grab.Get(fmt.Sprintf("%s/%s", BackupPath, filename), RootFSURL)
 	if err != nil {
 		log.Error(err)
 		return err
 	} 
-	log.Info(fmt.Sprintf("Download completed for %s into %s/%s", RootFSUrl, BackupPath, filename))
+	log.Info(fmt.Sprintf("Download completed for %s into %s/%s", RootFSURL, BackupPath, filename))
 	return nil
 }
 
@@ -48,16 +45,13 @@ func copyResource(filename string) error {
 var backupLiveImageCmd = &cobra.Command{
 	Use:   "backupLiveImage",
 	Short: "It will read the rootfs url and will copy into given folder ",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
+		RootFSURL, _ := cmd.Flags().GetString("RootFSURL")
+		BackupPath, _ := cmd.Flags().GetString("BackupPath")
+
 		// validate url
-		result, err := url.ParseRequestURI(RootFSUrl)
+		result, err := url.ParseRequestURI(RootFSURL)
 		if err != nil {
 			log.Error(err)
 			return err	
@@ -68,25 +62,29 @@ to quickly create a Cobra application.`,
 		
 		// validate path
 		if _, err := os.Stat(BackupPath); os.IsNotExist(err) {
-			// path/to/whatever does not exist
-			log.Error(err)
-			return err
+			// create path
+			err := os.Mkdir(BackupPath, os.ModePerm)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
 		}
 
 		// start copying the resource
-		return copyResource(filename)
+		return copyResource(RootFSURL, BackupPath, filename)
 	},
 }
 
 func init() {
+	
 	rootCmd.AddCommand(backupLiveImageCmd)
 
-	backupLiveImageCmd.Flags().StringVarP(&RootFSUrl, "rootFSURL", "u", "", "URL from where to download the live rootfs img")
-	backupLiveImageCmd.Flags().StringVarP(&BackupPath, "BackupPath", "p", "", "Path where to store the rootfs url")
-	backupLiveImageCmd.MarkFlagRequired("rootFSURL")
+	backupLiveImageCmd.Flags().StringP("RootFSURL", "u", "", "URL from where to download the live rootfs img")
+	backupLiveImageCmd.Flags().StringP("BackupPath", "p", "", "Path where to store the rootfs url")
+	backupLiveImageCmd.MarkFlagRequired("RootFSURL")
 	backupLiveImageCmd.MarkFlagRequired("BackupPath")
 
 	// bind to viper
-	viper.BindPFlag("rootFSURL", backupLiveImageCmd.Flags().Lookup("rootFSURL"))
-	viper.BindPFlag("BackupPath", backupLiveImageCmd.Flags().Lookup("backupPath"))
+	viper.BindPFlag("RootFSURL", backupLiveImageCmd.Flags().Lookup("RootFSURL"))
+	viper.BindPFlag("BackupPath", backupLiveImageCmd.Flags().Lookup("BackupPath"))
 }

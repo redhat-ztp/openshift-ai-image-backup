@@ -13,3 +13,6 @@ build-image:
 
 push-image:
 	$(CONTAINER_COMMAND) push ${IMAGE}
+
+clean:
+	rm -rf build
