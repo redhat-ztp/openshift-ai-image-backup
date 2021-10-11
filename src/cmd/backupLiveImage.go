@@ -29,16 +29,23 @@ import (
 )
 
 func copyResource(RootFSURL string, BackupPath string, filename string) error {
-	// first remove all content in that folder
-	os.RemoveAll(BackupPath)
+	// if filename is already there, do nothing
+	if _, err := os.Stat(fmt.Sprintf("%s/%s", BackupPath, filename)); os.IsNotExist(err) {
 
-	_, err := grab.Get(fmt.Sprintf("%s/%s", BackupPath, filename), RootFSURL)
-	if err != nil {
-		log.Error(err)
-		return err
-	} 
-	log.Info(fmt.Sprintf("Download completed for %s into %s/%s", RootFSURL, BackupPath, filename))
-	return nil
+		// first remove all content in that folder
+		os.RemoveAll(BackupPath)
+
+		_, err := grab.Get(fmt.Sprintf("%s/%s", BackupPath, filename), RootFSURL)
+		if err != nil {
+			log.Error(err)
+			return err
+		} 
+		log.Info(fmt.Sprintf("Download completed for %s into %s/%s", RootFSURL, BackupPath, filename))
+		return nil
+	} else  {
+		log.Info(fmt.Sprintf("Image %s already exists, skipping download", filename))
+		return nil
+	}
 }
 
 // backupLiveImageCmd represents the backupLiveImage command

@@ -25,27 +25,35 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 // sync image with skopeo
 func syncImage(ReleaseImageURL string, BackupPath string, AuthFilePath string) error {
-	// first remove all content in that folder
-	os.RemoveAll(BackupPath)
+	// get the file name from the image to check if exists
+	filename := ReleaseImageURL[strings.LastIndex(ReleaseImageURL, "/")+1:]
+	if _, err := os.Stat(fmt.Sprintf("%s/%s", BackupPath, filename)); os.IsNotExist(err) {
+		// first remove all content in that folder
+		os.RemoveAll(BackupPath)
 
-	skopeoArgs := []string{"sync", "--src", "docker", "--dest", "dir", ReleaseImageURL, BackupPath}
+		skopeoArgs := []string{"sync", "--src", "docker", "--dest", "dir", ReleaseImageURL, BackupPath}
 
-	if len(AuthFilePath) > 0 {
-		// add the authfile flag
-		skopeoArgs = append(skopeoArgs, []string{"--authfile", AuthFilePath}...)
+		if len(AuthFilePath) > 0 {
+			// add the authfile flag
+			skopeoArgs = append(skopeoArgs, []string{"--authfile", AuthFilePath}...)
+		}
+
+		_, err := exec.Command("/usr/bin/skopeo", skopeoArgs...).Output()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		log.Info(fmt.Sprintf("Sync completed for %s into %s", ReleaseImageURL, BackupPath))
+		return nil
+	} else {
+		log.Info(fmt.Sprintf("Image %s already exists, skipping download", filename))
+		return nil
 	}
-
-	_, err := exec.Command("/usr/bin/skopeo", skopeoArgs...).Output()
-    if err != nil {
-        log.Error(err)
-		return err
-    }
-	log.Info(fmt.Sprintf("Sync completed for %s into %s", ReleaseImageURL, BackupPath))
-	return nil
 }
 
 var backupReleaseImageCmd = &cobra.Command{
