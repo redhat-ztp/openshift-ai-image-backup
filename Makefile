@@ -17,7 +17,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 )
 
 build:
-	CGO_ENABLED=0 go build -o build/openshift-ai-image-backup pkg/main.go
+	hack/build-go.sh
 .PHONY: build
 
 build-image:
@@ -27,8 +27,6 @@ build-image:
 push-image:
 	$(CONTAINER_COMMAND) push ${IMAGE}
 
-clean:
-	rm -rf build
 .PHONY: build
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...

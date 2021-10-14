@@ -20,7 +20,7 @@ RUN make build
 
 FROM quay.io/centos/centos:stream8
 
-COPY --from=builder /go/src/github.com/redhat-ztp/openshift-ai-image-backup/build/openshift-ai-image-backup /usr/bin/openshift-ai-image-backup
+COPY --from=builder /go/src/github.com/redhat-ztp/openshift-ai-image-backup/bin/openshift-ai-image-backup /usr/bin/openshift-ai-image-backup
 
 # Point to the Authorization file
 ENV REGISTRY_AUTH_FILE=/tmp/auth.json
