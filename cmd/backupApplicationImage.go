@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -13,12 +14,17 @@ import (
 )
 
 func copyImage(BackupPath string) error {
-	//bash command to execute on the spoke
-	bashArgs := fmt.Sprintf("for id in $(crictl images -o json | jq -r '.images[].id'); skopeo copy containers-storage:$id dir:%s/$id; done", BackupPath)
 
-	_, err := exec.Command(bashArgs).Output()
+	if check := strings.Contains(BackupPath[len(BackupPath)-1:], "/"); check {
+		BackupPath = BackupPath[:len(BackupPath)-1]
+	}
+
+	//bash command to execute on the spoke
+	bashArgs := fmt.Sprintf("for id in $(crictl images -o json | jq -r '.images[].id'); do mkdir -p %s/$id; /usr/bin/skopeo copy containers-storage:$id dir:%s/$id; done", BackupPath, BackupPath)
+
+	_, err := exec.Command("/bin/bash", "-c", bashArgs).Output()
 	if err != nil {
-		log.Errorf("Couldn't execute the command, err: %s", err)
+		log.Error(err)
 		return err
 	}
 
