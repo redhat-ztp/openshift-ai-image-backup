@@ -26,7 +26,6 @@ RUN wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION
          && tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/bin \
          && rm -f crictl-$VERSION-linux-amd64.tar.gz
 
-
 COPY --from=builder /go/src/github.com/redhat-ztp/openshift-ai-image-backup/bin/openshift-ai-image-backup /usr/bin/openshift-ai-image-backup
 
 # Point to the Authorization file
