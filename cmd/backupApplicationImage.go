@@ -21,12 +21,14 @@ func copyImage(BackupPath string) error {
 	}
 
 	//bash command to execute on the spoke
+
 	bashArgs := fmt.Sprintf("for id in $(crictl images -o json | jq -r '.images[].id'); do mkdir -p %s/$id; /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:%s/$id; done", BackupPath, BackupPath)
 
 	cmd := exec.Command("/bin/bash", "-c", bashArgs)
 	cmd.Stdout = io.Writer(os.Stdout)
 
 	err := cmd.Run()
+
 	if err != nil {
 		log.Error(err)
 		return err
