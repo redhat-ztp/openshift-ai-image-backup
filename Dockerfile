@@ -14,7 +14,6 @@ RUN make build
 FROM quay.io/centos/centos:stream8
 ENV CRICTL_VERSION="v1.22.0"
 
-# RUN yum -y install skopeo && yum -y install wget && yum -y install jq
 RUN yum -y install skopeo wget jq
 RUN useradd skopeo
 
