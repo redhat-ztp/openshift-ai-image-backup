@@ -12,9 +12,11 @@ COPY . .
 RUN make build
 
 FROM quay.io/centos/centos:stream8
-ENV VERSION="v1.22.0"
 
-RUN yum -y install skopeo && yum -y install wget && yum -y install jq
+ENV CRICTL_VERSION="v1.22.0"
+
+RUN yum -y install skopeo wget jq
+
 RUN useradd skopeo
 
 # Setup skopeo's uid/guid entries
@@ -22,9 +24,11 @@ RUN echo skopeo:100000:65536 > /etc/subuid
 RUN echo skopeo:100000:65536 > /etc/subgid
 
 # install crictl
-RUN wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$VERSION/crictl-$VERSION-linux-amd64.tar.gz \
-         && tar zxvf crictl-$VERSION-linux-amd64.tar.gz -C /usr/bin \
-         && rm -f crictl-$VERSION-linux-amd64.tar.gz
+
+RUN wget https://github.com/kubernetes-sigs/cri-tools/releases/download/$CRICTL_VERSION/crictl-$CRICTL_VERSION-linux-amd64.tar.gz \
+         && tar zxvf crictl-$CRICTL_VERSION-linux-amd64.tar.gz -C /usr/bin \
+         && rm -f crictl-$CRICTL_VERSION-linux-amd64.tar.gz
+
 
 COPY --from=builder /go/src/github.com/redhat-ztp/openshift-ai-image-backup/bin/openshift-ai-image-backup /usr/bin/openshift-ai-image-backup
 
