@@ -36,6 +36,8 @@ const etc string = "/etc/"
 const usrlocal string = "/usr/local/"
 const kubelet string = "/var/lib/kubelet/"
 
+var folders []string = []string{"containers", "cluster", "etc", "usrlocal", "kubelet"}
+
 func launchBackup(BackupPath string) error {
 
 	// check for back slash in the BackupPath
@@ -43,18 +45,84 @@ func launchBackup(BackupPath string) error {
 		BackupPath = BackupPath[:len(BackupPath)-1]
 	}
 
+	err := cleanup(BackupPath)
+	if err != nil {
+		log.Error(fmt.Printf("Old directories couldn't be deleted, err: %s\n", err))
+	}
+
+	log.Info("Old contents have been cleaned up")
+
+	path, err := createDir(BackupPath)
+	if err != nil {
+		log.Error(fmt.Printf("Old directories couldn't be deleted, err: %s\n", err))
+	}
+
+	//ostree pinning
+	ostreeArgs := "ostree admin pin 0"
+	err = executeArgs(ostreeArgs, "backup-time", "ostree")
+	if err != nil {
+		log.Error(err)
+	}
+
+	/*	// container image backup
+		bashArgs := fmt.Sprintf("for id in $(crictl images -o json | jq -r '.images[].id'); do mkdir -p %s/$id; /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:%s/$id; done", path[0], path[0])
+		err = executeArgs(bashArgs, path[0], "containers")
+		if err != nil {
+			log.Warn(err)
+		}
+	*/
+	// cluster backup
+	err = executeArgs(BackupScript, path[1], "etcd-cluster")
+	if err != nil {
+		return err
+	}
+
+	// etc back up
+	etcExcludeArgs := fmt.Sprintf("cat /etc/tmpfiles.d/* | sed 's/#.*//' | awk '{print $2}' | grep '^/etc/' | sed 's#^/etc/##' > %s/etc.exclude.list; echo '.updated' >> %s/etc.exclude.list; echo 'kubernetes/manifests' >> %s/etc.exclude.list", BackupPath, BackupPath, BackupPath)
+	err = executeArgs(etcExcludeArgs, BackupPath, "etc-exclude-list")
+	if err != nil {
+		log.Error(err)
+	}
+
+	// usrlocal backup
+	etcArgs := fmt.Sprintf("rsync -a %s %s", etc, path[2])
+	err = executeArgs(etcArgs, path[2], etc)
+	if err != nil {
+		log.Error(err)
+	}
+
+	usrlocalArgs := fmt.Sprintf("rsync -a %s %s", usrlocal, path[3])
+	err = executeArgs(usrlocalArgs, path[3], usrlocal)
+	if err != nil {
+		log.Error(err)
+	}
+
+	kubeletArgs := fmt.Sprintf("rsync -a %s %s", kubelet, path[4])
+	err = executeArgs(kubeletArgs, path[4], kubelet)
+	if err != nil {
+		log.Error(err)
+	}
+
+	log.Info(strings.Repeat("-", 60))
+	log.Info("backup has succesfully finished ...")
+
+	return nil
+
+}
+
+//cleanups the old files and directory
+func cleanup(path string) error {
 	//change root directory to /host
 	if err := syscall.Chroot(host); err != nil {
 		log.Println("Couldn't do chroot to %s", host)
 		return nil
 	}
 
-	log.Info(fmt.Println(strings.Repeat("-", 45)))
-	log.Info(fmt.Println("Cleaning up old contents and ostree deployment started ..."))
-	log.Info(fmt.Println(strings.Repeat("-", 45)))
-
+	log.Info(strings.Repeat("-", 60))
+	log.Info("Cleaning up old contents and ostree deployment started ...")
+	log.Info(strings.Repeat("-", 60))
 	// Cleanup previous backups
-	dir, _ := os.Open(BackupPath)
+	dir, _ := os.Open(path)
 	subDir, _ := dir.Readdir(0)
 
 	// Loop over the directory's files.
@@ -63,122 +131,72 @@ func launchBackup(BackupPath string) error {
 
 		// Get name of file and its full path.
 		name := fileNames.Name()
-		fullPath := BackupPath + "/" + name
-		log.Info(fmt.Printf("fullpath: %s", fullPath))
+		fullPath := path + "/" + name
+		log.Info("\nfullpath: ", fullPath)
 
 		if subDir[index].Name() != "extras.tgz" {
 			// Remove the file.
-			os.RemoveAll(fullPath)
+			err := os.RemoveAll(fullPath)
+			if err != nil {
+				log.Error(err)
+				return err
+			}
 		}
-
 	}
-	log.Info(fmt.Println("Old directories deleted with contents"))
+	log.Info("Old directories deleted with contents")
 
 	// ostree undeploy of previous deployments
 	ostreeClean := "while :; do ostree admin undeploy 1 || break; done"
-	_, err := exec.Command("/bin/bash", "-c", ostreeClean).Output()
+	err := executeArgs(ostreeClean, "backup-time", "ostree-cleaning")
 	if err != nil {
 		log.Error(err)
-		//	return err
+		return err
 	}
-	log.Info(fmt.Println("Ostree pin undeployed"))
+	return nil
+}
 
+//create new directories
+func createDir(path string) ([]string, error) {
 	//create backup folders
-	//position				0			1		   2		3			4
-	folders := []string{"containers", "cluster", "etc", "usrlocal", "kubelet"}
-	path := make([]string, len(folders))
-
-	os.Chdir(BackupPath)
+	newPath := make([]string, len(folders))
+	os.Chdir(path)
 
 	for i := 0; i < len(folders); i++ {
 		err := os.Mkdir(folders[i], os.ModePerm)
 		if err != nil {
 			log.Error(err)
-			//		return err
+			return nil, err
 		}
-		path[i] = BackupPath + "/" + folders[i]
-		log.Info(fmt.Printf("file created: %s", path[i]))
+		newPath[i] = path + "/" + folders[i]
+		log.Info("sub directory created at: ", newPath[i])
 	}
+	return newPath, nil
+}
 
-	log.Info(fmt.Println(strings.Repeat("-", 45)))
-	log.Info(fmt.Println("Old contents have been cleaned up"))
-	log.Info(fmt.Println(strings.Repeat("-", 45)))
-	// ------------- end cleanup ------------
-
-	// ------------- start backup ------------
-	log.Info(fmt.Println("New contents will be backed up with new ostree deployment..."))
-	log.Info(fmt.Println(strings.Repeat("-", 45)))
-	//ostree pinning
-	ostreeArgs := "ostree admin pin 0"
-	_, err = exec.Command("/bin/bash", "-c", ostreeArgs).Output()
-	if err != nil {
-		log.Error(err)
-		//	return err
+//execute shell commands
+func executeArgs(arg string, path string, resource string) error {
+	if resource == "etcd-cluster" {
+		_, err := exec.Command(arg, path).Output()
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		return nil
 	}
-	log.Info(fmt.Println("ostree backup has been created"))
-
-	// container image backup
-	bashArgs := fmt.Sprintf("for id in $(crictl images -o json | jq -r '.images[].id'); do mkdir -p %s/$id; /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:%s/$id; done", path[0], path[0])
-	_, err = exec.Command("/bin/bash", "-c", bashArgs).Output()
-	if err != nil {
-		log.Warn(err)
-	}
-	log.Info(fmt.Sprintf("Application images have been copied into %s", path[0]))
-
-	// cluster backup
-	_, err = exec.Command(BackupScript, path[1]).Output()
+	_, err := exec.Command("/bin/bash", "-c", arg).Output()
 	if err != nil {
 		log.Error(err)
 		return err
 	}
-	log.Info(fmt.Sprintf("Etcd snapshot is backed up at %s", BackupPath))
 
-	// etc back up
-	etcExcludeArgs := fmt.Sprintf("cat /etc/tmpfiles.d/* | sed 's/#.*//' | awk '{print $2}' | grep '^/etc/' | sed 's#^/etc/##' > %s/etc.exclude.list; echo '.updated' >> %s/etc.exclude.list; echo 'kubernetes/manifests' >> %s/etc.exclude.list", BackupPath, BackupPath, BackupPath)
-	_, err = exec.Command("/bin/bash", "-c", etcExcludeArgs).Output()
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	log.Info(fmt.Sprintf("etc.exclude.list has been updated under %s", BackupPath))
-
-	// usrlocal backup
-	etcArgs := fmt.Sprintf("rsync -a %s %s", etc, path[2])
-	_, err = exec.Command("/bin/bash", "-c", etcArgs).Output()
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	log.Info(fmt.Sprintf("/etc dir backup has been taken into %s", path[2]))
-
-	// usrlocal backup
-	usrlocalArgs := []string{"-a", usrlocal, path[3]}
-	_, err = exec.Command("rsync", usrlocalArgs...).Output()
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	log.Info(fmt.Sprintf("/usr/local dir backup has been taken into %s/%s", BackupPath, path[3]))
-
-	kubeletArgs := []string{"-a", kubelet, path[4]}
-	_, err = exec.Command("rsync", kubeletArgs...).Output()
-	if err != nil {
-		log.Error(err)
-		return err
-	}
-	log.Info(fmt.Sprintf("/var/lib/kubelet dir backup has been taken into %s/%s", BackupPath, path[4]))
-
-	log.Info(fmt.Println(strings.Repeat("-", 45)))
-	log.Info(fmt.Println("backup has succesfully finished ..."))
-
+	log.Info(fmt.Sprintf("%s backup has been taken at %s", resource, path))
 	return nil
-
 }
 
 // launchBackupCmd represents the launch command
 var launchBackupCmd = &cobra.Command{
 	Use:   "launchBackup",
-	Short: "It will read the rootfs url and will copy into given folder ",
+	Short: "It will trigger backup of resources in the specified path",
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		BackupPath, _ := cmd.Flags().GetString("BackupPath")
