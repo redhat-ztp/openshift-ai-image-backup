@@ -38,6 +38,8 @@ const kubelet string = "/var/lib/kubelet/"
 
 var folders []string = []string{"containers", "cluster", "etc", "usrlocal", "kubelet"}
 
+//launchBackup triggers the backup procedure
+// returns:			error
 func launchBackup(BackupPath string) error {
 
 	// check for back slash in the BackupPath
@@ -64,6 +66,7 @@ func launchBackup(BackupPath string) error {
 		log.Error(err)
 	}
 
+	// for now we skip the container image backup
 	/*	// container image backup
 		bashArgs := fmt.Sprintf("for id in $(crictl images -o json | jq -r '.images[].id'); do mkdir -p %s/$id; /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:%s/$id; done", path[0], path[0])
 		err = executeArgs(bashArgs, path[0], "containers")
@@ -110,7 +113,8 @@ func launchBackup(BackupPath string) error {
 
 }
 
-//cleanups the old files and directory
+// cleanup deletes all old sub diectories and files in the recovery partition
+// returns: 			error
 func cleanup(path string) error {
 	//change root directory to /host
 	if err := syscall.Chroot(host); err != nil {
@@ -155,7 +159,8 @@ func cleanup(path string) error {
 	return nil
 }
 
-//create new directories
+//createDir creates new sub-directories where backup will be stored
+// returns:  slice of filepath ([]string) error
 func createDir(path string) ([]string, error) {
 	//create backup folders
 	newPath := make([]string, len(folders))
@@ -173,7 +178,8 @@ func createDir(path string) ([]string, error) {
 	return newPath, nil
 }
 
-//execute shell commands
+//executeArgs execute shell commands
+//returns: 			error
 func executeArgs(arg string, path string, resource string) error {
 	if resource == "etcd-cluster" {
 		_, err := exec.Command(arg, path).Output()
