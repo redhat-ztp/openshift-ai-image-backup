@@ -28,5 +28,9 @@ jobs:
         with:
           exclude: "./vendor/..."
           name: "Revive"
+      - name: Install golint
+        run: go get golang.org/x/lint/golint
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.44.0
       - name: Run linters
-        run: make check
+        run: make GO_REQUIRED_MIN_VERSION:= check
