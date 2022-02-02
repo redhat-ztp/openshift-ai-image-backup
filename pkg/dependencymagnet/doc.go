@@ -6,5 +6,7 @@
 package dependencymagnet
 
 import (
+	_ "github.com/golangci/golangci-lint/cmd/golangci-lint"
 	_ "github.com/openshift/build-machinery-go"
+	_ "golang.org/x/lint/golint"
 )
