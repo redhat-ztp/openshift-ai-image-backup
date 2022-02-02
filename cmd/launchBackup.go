@@ -19,6 +19,7 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"syscall"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -115,12 +116,12 @@ func LaunchBackup(BackupPath string) error {
 // Cleanup deletes all old sub diectories and files in the recovery partition
 // returns: 			error
 func Cleanup(path string) error {
-	/*	//change root directory to /host
-		if err := syscall.Chroot(host); err != nil {
-			log.Errorf("Couldn't do chroot to %s, err: %s", host, err)
-			return err
-		}
-	*/
+	//change root directory to /host
+	if err := syscall.Chroot(host); err != nil {
+		log.Errorf("Couldn't do chroot to %s, err: %s", host, err)
+		return err
+	}
+
 	log.Info(strings.Repeat("-", 60))
 	log.Info("Cleaning up old contents and ostree deployment started ...")
 	log.Info(strings.Repeat("-", 60))
@@ -159,6 +160,10 @@ func Cleanup(path string) error {
 //CreateDir creates new sub-directories where backup will be stored
 // returns:  slice of filepath ([]string) error
 func CreateDir(path string) ([]string, error) {
+
+	log.Info(strings.Repeat("-", 60))
+	log.Info("Creating new directories and backup has been started ...")
+	log.Info(strings.Repeat("-", 60))
 	//create backup folders
 	newPath := make([]string, len(folders))
 	os.Chdir(path)
