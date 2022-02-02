@@ -166,7 +166,11 @@ func CreateDir(path string) ([]string, error) {
 	log.Info(strings.Repeat("-", 60))
 	//create backup folders
 	newPath := make([]string, len(folders))
-	os.Chdir(path)
+	err := os.Chdir(path)
+	if err != nil {
+		log.Error(err)
+		return nil, err
+	}
 
 	for i := 0; i < len(folders); i++ {
 		err := os.Mkdir(folders[i], 0700)
@@ -229,8 +233,8 @@ func init() {
 	rootCmd.AddCommand(launchBackupCmd)
 
 	launchBackupCmd.Flags().StringP("BackupPath", "p", "", "Path where to store the backup")
-	launchBackupCmd.MarkFlagRequired("BackupPath")
+	_ = launchBackupCmd.MarkFlagRequired("BackupPath")
 
 	// bind to viper
-	viper.BindPFlag("BackupPath", launchBackupCmd.Flags().Lookup("BackupPath"))
+	_ = viper.BindPFlag("BackupPath", launchBackupCmd.Flags().Lookup("BackupPath"))
 }
