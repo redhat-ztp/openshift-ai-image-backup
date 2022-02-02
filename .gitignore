@@ -16,3 +16,5 @@
 
 # Code coverage
 *.out
+
+bin/

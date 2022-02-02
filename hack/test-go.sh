@@ -3,6 +3,7 @@
 # without cache: go test -count=1 -v ./pkg/storage/
 set -e -x
 echo "Linting go code..."
-golint ./cmd ./pkg
+make golangci-lint
+make verify
 echo "Running go tests..."
 KUBEBUILDER_ASSETS="$(pwd)/bin" go test -v -covermode=count -coverprofile=coverage.out ./...

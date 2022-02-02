@@ -29,4 +29,11 @@ push-image:
 
 .PHONY: build
 
+check: | verify golangci-lint
+.PHONY: check
+
+golangci-lint:
+		golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
+.PHONY: golangci-lint
+
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
