@@ -29,6 +29,7 @@ spec:
         volumeMounts:
         - name: container-backup
           mountPath: /host
+      hostNetwork: true
       restartPolicy: Never
       volumes:
         - name: container-backup
@@ -148,6 +149,7 @@ spec:
                   - 
                     mountPath: /host
                     name: backup
+            hostNetwork: true
             restartPolicy: Never
             serviceAccountName: backupresource
             volumes:
