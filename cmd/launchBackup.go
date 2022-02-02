@@ -25,9 +25,12 @@ import (
 	"github.com/spf13/viper"
 
 	"os"
+	"path/filepath"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
+
+	"github.com/redhat-ztp/openshift-ai-image-backup/internal/recovery_assets"
 )
 
 const host string = "/host"
@@ -65,6 +68,14 @@ func LaunchBackup(BackupPath string) error {
 	if err != nil {
 		log.Error(err)
 	}
+
+	scriptfile, _ := recovery_assets.Asset("recovery/upgrade-recovery.sh")
+	err = os.WriteFile(filepath.Join(BackupPath, "upgrade-recovery.sh"), scriptfile, 0700)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+	log.Info("Upgrade recovery script written")
 
 	// for now we skip the container image backup
 	/*	// container image backup
@@ -188,14 +199,19 @@ func CreateDir(path string) ([]string, error) {
 //returns: 			error
 func ExecuteArgs(arg string, path string, resource string) error {
 	if resource == "etcd-cluster" {
-		_, err := exec.Command(arg, path).Output()
+		log.Info(fmt.Sprintf("Running: %s %s", arg, path))
+		out, err := exec.Command(arg, path).CombinedOutput()
+		log.Printf("%s", out)
 		if err != nil {
 			log.Error(err)
 			return err
 		}
 		return nil
 	}
-	_, err := exec.Command("/bin/bash", "-c", arg).Output()
+
+	log.Info(fmt.Sprintf("Running: /bin/bash -c %s", arg))
+	out, err := exec.Command("/bin/bash", "-c", arg).CombinedOutput()
+	log.Printf("%s", out)
 	if err != nil {
 		log.Error(err)
 		return err

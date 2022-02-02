@@ -3,6 +3,7 @@ module github.com/redhat-ztp/openshift-ai-image-backup
 go 1.16
 
 require (
+	github.com/go-bindata/go-bindata v1.0.0
 	github.com/golangci/golangci-lint v1.44.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/openshift/build-machinery-go v0.0.0-20200512074546-3744767c4131
