@@ -220,15 +220,11 @@ function take_backup {
     fi
 
     echo "##### $(date -u): Backing up container images, cluster, and required files"
-    # Note: The cluster-restore script uses a hardcoded path for manifests-stopped dir
-    rm -rf ${BACKUP_DIR} /home/core/assets/manifests-stopped
 
-    mkdir -p ${BACKUP_DIR}
-
-    time for id in $(crictl images -o json | jq -r '.images[].id'); do
-        mkdir -p ${BACKUP_DIR}/containers/$id
-        /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:${BACKUP_DIR}/containers/$id
-    done
+    #time for id in $(crictl images -o json | jq -r '.images[].id'); do
+    #    mkdir -p ${BACKUP_DIR}/containers/$id
+    #    /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:${BACKUP_DIR}/containers/$id
+    #done
 
     /usr/local/bin/cluster-backup.sh ${BACKUP_DIR}/cluster
     if [ $? -ne 0 ]; then
@@ -318,13 +314,13 @@ function restore_images_and_files {
     #
     # Restore container images
     #
-    if [ "${SKIP_IMAGE_RESTORE}" = "no" ]; then
-        echo "##### $(date -u): Restoring container images"
-        time for id in $(find ${BACKUP_DIR}/containers -mindepth 1 -maxdepth 2 -type d); do
-            /usr/bin/skopeo copy dir:$id containers-storage:local/$(basename $id)
-        done
-        echo "##### $(date -u): Completed restoring container images"
-    fi
+    #if [ "${SKIP_IMAGE_RESTORE}" = "no" ]; then
+    #    echo "##### $(date -u): Restoring container images"
+    #    time for id in $(find ${BACKUP_DIR}/containers -mindepth 1 -maxdepth 2 -type d); do
+    #        /usr/bin/skopeo copy dir:$id containers-storage:local/$(basename $id)
+    #    done
+    #    echo "##### $(date -u): Completed restoring container images"
+    #fi
 
     #
     # Restore /usr/local content

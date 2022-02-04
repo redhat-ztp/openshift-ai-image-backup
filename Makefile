@@ -7,7 +7,7 @@ IMAGE := $(or ${IMAGE},quay.io/redhat_ztp/openshift-ai-image-backup:latest)
 GIT_REVISION := $(shell git rev-parse HEAD)
 CONTAINER_BUILD_PARAMS = --label git_revision=${GIT_REVISION}
 
-all: build build-image push-image
+all: build build-image
 .PHONY: all
 
 # Include the library makefile
@@ -33,11 +33,11 @@ build:
 	hack/build-go.sh
 .PHONY: build
 
-build-image:
+build-image: build
 	$(CONTAINER_COMMAND) build $(CONTAINER_BUILD_PARAMS) -f Dockerfile . -t $(IMAGE)
 .PHONY:
 
-push-image:
+push-image: build-image
 	$(CONTAINER_COMMAND) push ${IMAGE}
 
 .PHONY: build
