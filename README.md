@@ -16,6 +16,7 @@ metadata:
   name: container-image
 automountServiceAccountToken: false
 spec:
+  backoffLimit: 0
   template:
     spec:
       containers:
@@ -131,6 +132,7 @@ spec:
       metadata:
         name: backupresource
       spec:
+        backoffLimit: 0
         template:
           spec:
             containers:
