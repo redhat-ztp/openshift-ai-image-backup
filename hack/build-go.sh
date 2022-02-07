@@ -15,12 +15,12 @@ git version > /dev/null 2>&1 || hasGit=false
 GIT_SHA=""
 GIT_TREE_STATE=""
 GIT_TAG=""
-GIT_LAST_TAG=""
+GIT_TAG_LAST=""
 RELEASE_STATUS="unreleased"
 if $hasGit; then
     GIT_SHA=$(git rev-parse --short HEAD)
     # Tree state is "dirty" if there are uncommitted changes, untracked files are ignored
-    GIT_TREE_STATE=$(test -n "`git status --porcelain --untracked-files=no`" && echo "dirty" || echo "clean")
+    GIT_TREE_STATE=$(test -n "$(git status --porcelain --untracked-files=no)" && echo "dirty" || echo "clean")
     # Empty string if we are not building a tag
     GIT_TAG=$(git describe --tags --abbrev=0 --exact-match 2>/dev/null || true)
     # Find most recent tag
