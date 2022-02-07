@@ -73,7 +73,7 @@ func LaunchBackup(BackupPath string) error {
 	log.Info("Upgrade recovery script written")
 
 	// Take backup
-	backupCmd := fmt.Sprintf("%s --take-backup %s", scriptname, BackupPath)
+	backupCmd := fmt.Sprintf("%s --take-backup %s --skip-images", scriptname, BackupPath)
 	err = ExecuteCmd(backupCmd)
 	if err != nil {
 		return err
