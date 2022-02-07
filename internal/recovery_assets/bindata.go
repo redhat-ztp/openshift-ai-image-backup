@@ -68,9 +68,18 @@ ${PROG}: Runs post-rollback restore procedure
 
 Options:
     --dir <dir>:    Location of backup content
+
+Backup options:
+    --take-backup:  Take backup
+    --skip-images:  Skip backup of container images
+
+Recovery options:
     --force:        Skip ostree deployment check
     --skip-images:  Skip restore of container images
     --skip-wipe:    Skip crio wipe step
+    --step:         Step through recovery stages
+    --resume:       Resume recovery after last successful stage
+    --restart:      Restart recovery from first stage
 ENDUSAGE
     exit 1
 }
@@ -206,9 +215,6 @@ function trigger_redeployment {
 function take_backup {
     echo "##### $(date -u): Taking backup"
 
-    #echo "##### $(date -u): Cleaning completed pods"
-    #oc delete pod --field-selector=status.phase==Succeeded --all-namespaces
-
     echo "##### $(date -u): Wiping previous deployments and pinning active"
     while :; do
         ostree admin undeploy 1 || break
@@ -221,10 +227,12 @@ function take_backup {
 
     echo "##### $(date -u): Backing up container images, cluster, and required files"
 
-    #time for id in $(crictl images -o json | jq -r '.images[].id'); do
-    #    mkdir -p ${BACKUP_DIR}/containers/$id
-    #    /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:${BACKUP_DIR}/containers/$id
-    #done
+    if [ "${SKIP_IMAGES}" = "no" ]; then
+        time for id in $(crictl images -o json | jq -r '.images[].id'); do
+            mkdir -p ${BACKUP_DIR}/containers/$id
+            /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:${BACKUP_DIR}/containers/$id
+        done
+    fi
 
     /usr/local/bin/cluster-backup.sh ${BACKUP_DIR}/cluster
     if [ $? -ne 0 ]; then
@@ -253,12 +261,13 @@ function take_backup {
         exit 1
     fi
 
-    #oc get mc -o=jsonpath='{range .items[*]}{range .spec.config.storage.files[*]}{.path}{"\n"}' | sort -u \
-    #    | grep -v -e '^/etc/' -e '^/usr/local/' -e '^$' | xargs --no-run-if-empty tar czf ${BACKUP_DIR}/extras.tgz
-    #if [ $? -ne 0 ]; then
-    #    echo "Failed to backup additional managed files" >&2
-    #    exit 1
-    #fi
+    oc get mc -o=jsonpath='{range .items[*]}{range .spec.config.storage.files[*]}{.path}{"\n"}' | sort -u \
+        | grep -v -e '^/etc/' -e '^/usr/local/' -e '/var/lib/kubelet/' -e '^$' \
+        | xargs --no-run-if-empty tar czf ${BACKUP_DIR}/extras.tgz
+    if [ $? -ne 0 ]; then
+        echo "Failed to backup additional managed files" >&2
+        exit 1
+    fi
 
     echo "##### $(date -u): Backup complete"
 }
@@ -314,13 +323,13 @@ function restore_images_and_files {
     #
     # Restore container images
     #
-    #if [ "${SKIP_IMAGE_RESTORE}" = "no" ]; then
-    #    echo "##### $(date -u): Restoring container images"
-    #    time for id in $(find ${BACKUP_DIR}/containers -mindepth 1 -maxdepth 2 -type d); do
-    #        /usr/bin/skopeo copy dir:$id containers-storage:local/$(basename $id)
-    #    done
-    #    echo "##### $(date -u): Completed restoring container images"
-    #fi
+    if [ "${SKIP_IMAGES}" = "no" ]; then
+        echo "##### $(date -u): Restoring container images"
+        time for id in $(find ${BACKUP_DIR}/containers -mindepth 1 -maxdepth 2 -type d); do
+            /usr/bin/skopeo copy dir:$id containers-storage:local/$(basename $id)
+        done
+        echo "##### $(date -u): Completed restoring container images"
+    fi
 
     #
     # Restore /usr/local content
@@ -367,26 +376,26 @@ function restore_images_and_files {
     #
     # Restore additional machine-config managed files
     #
-    #if [ -f ${BACKUP_DIR}/extras.tgz ]; then
-    #    echo "##### $(date -u): Restoring extra content"
-    #    tar xzf ${BACKUP_DIR}/extras.tgz -C /
-    #    if [ $? -ne 0 ]; then
-    #        echo "$(date -u): Failed to restore extra content" >&2
-    #        exit 1
-    #    fi
-    #    echo "##### $(date -u): Completed restoring extra content"
-    #fi
+    if [ -f ${BACKUP_DIR}/extras.tgz ]; then
+        echo "##### $(date -u): Restoring extra content"
+        tar xzf ${BACKUP_DIR}/extras.tgz -C /
+        if [ $? -ne 0 ]; then
+            echo "$(date -u): Failed to restore extra content" >&2
+            exit 1
+        fi
+        echo "##### $(date -u): Completed restoring extra content"
+    fi
 
     #
     # As systemd files may have been updated as part of the preceding restores,
     # run daemon-reload
     #
     systemctl daemon-reload
+    systemctl disable kubelet.service
 
     record_progress "restore_images_and_files"
 
     if [ "${REBOOT_REQUIRED}" = "yes" ]; then
-        systemctl disable kubelet.service
         echo "Some files restored require a reboot. Please reboot now, then use ${PROG} --resume option" >&2
         exit 0
     fi
@@ -470,7 +479,7 @@ declare BACKUP_DIR="/var/recovery"
 declare RESTART_TIMEOUT=1200 # 20 minutes
 declare REDEPLOYMENT_TIMEOUT=1200 # 20 minutes
 declare SKIP_DEPLOY_CHECK="no"
-declare SKIP_IMAGE_RESTORE="no"
+declare SKIP_IMAGES="no"
 declare SKIP_WIPE="no"
 declare TAKE_BACKUP="no"
 declare STEPTHROUGH="no"
@@ -505,7 +514,7 @@ while :; do
             shift
             ;;
         --skip-images)
-            SKIP_IMAGE_RESTORE="yes"
+            SKIP_IMAGES="yes"
             SKIP_WIPE="yes"
             shift
             ;;
@@ -534,6 +543,7 @@ done
 
 declare PROGRESS_FILE="${BACKUP_DIR}/progress"
 
+# shellcheck source=/dev/null
 source /etc/kubernetes/static-pod-resources/etcd-certs/configmaps/etcd-scripts/etcd-common-tools
 
 #
@@ -556,7 +566,6 @@ fi
 # Validate arguments
 #
 if [ ! -d "${BACKUP_DIR}/cluster" ] || \
-        [ ! -d "${BACKUP_DIR}/containers" ] || \
         [ ! -d "${BACKUP_DIR}/etc" ] || \
         [ ! -d "${BACKUP_DIR}/usrlocal" ] || \
         [ ! -d "${BACKUP_DIR}/kubelet" ]; then
