@@ -42,11 +42,20 @@ push-image: build-image
 
 .PHONY: build
 
-check: | verify golangci-lint
+check: | verify golangci-lint shell-check
 .PHONY: check
 
 golangci-lint:
 		golangci-lint run --verbose --print-resources-usage --modules-download-mode=vendor --timeout=5m0s
 .PHONY: golangci-lint
+
+ifeq ($(shell which shellcheck 2>/dev/null),)
+shell-check:
+	@echo "Skipping shellcheck: Not installed"
+else
+shell-check:
+	find . -name '*.sh' -not -path './vendor/*' -not -path './git/*' -print0 | xargs -0 --no-run-if-empty shellcheck
+endif
+.PHONY: shell-check
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...

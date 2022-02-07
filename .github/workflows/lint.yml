@@ -32,3 +32,13 @@ jobs:
         run: go install "./vendor/github.com/golangci/golangci-lint/cmd/golangci-lint/..."
       - name: Run linters
         run: make GO_REQUIRED_MIN_VERSION:= check
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run ShellCheck
+      uses: ludeeus/action-shellcheck@master
+      with:
+        version: v0.7.2
+        ignore_paths: .git vendor
