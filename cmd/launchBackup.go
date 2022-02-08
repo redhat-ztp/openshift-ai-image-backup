@@ -75,6 +75,16 @@ func LaunchBackup(BackupPath string) error {
 		return err
 	}
 
+	// validate path
+	if _, err := os.Stat(BackupPath); os.IsNotExist(err) {
+		// create path
+		err := os.Mkdir(BackupPath, 0700)
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+	}
+
 	err := Cleanup(BackupPath)
 	if err != nil {
 		log.Errorf("Old directories couldn't be deleted, err: %s\n", err)
@@ -168,16 +178,6 @@ var launchBackupCmd = &cobra.Command{
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		BackupPath, _ := cmd.Flags().GetString("BackupPath")
-
-		// validate path
-		if _, err := os.Stat(BackupPath); os.IsNotExist(err) {
-			// create path
-			err := os.Mkdir(BackupPath, 0700)
-			if err != nil {
-				log.Error(err)
-				return err
-			}
-		}
 
 		// start launching the backup of the resource
 		return LaunchBackup(BackupPath)
