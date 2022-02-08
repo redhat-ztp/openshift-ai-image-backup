@@ -36,6 +36,17 @@ import (
 const host string = "/host"
 const recoveryScript string = "upgrade-recovery.sh"
 
+//RecoveryInProgress checks if a restore is in progress
+// returns:			bool
+func RecoveryInProgress(BackupPath string) bool {
+	progressfile := filepath.Join(BackupPath, "progress")
+
+	if _, err := os.Stat(progressfile); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 //LaunchBackup triggers the backup procedure
 // returns:			error
 func LaunchBackup(BackupPath string) error {
@@ -49,6 +60,14 @@ func LaunchBackup(BackupPath string) error {
 	if err := syscall.Chroot(host); err != nil {
 		log.Errorf("Couldn't do chroot to %s, err: %s", host, err)
 		return err
+	}
+
+	// During recovery, this container may get relaunched, as it will be in "Running"
+	// state when the backup is taken. We'll check to see if a recovery is already
+	// in progress then, and just exit cleanly if so.
+	if RecoveryInProgress(BackupPath) {
+		log.Info("Cannot take backup. Recovery is currently in progress")
+		return nil
 	}
 
 	if err := os.Chdir("/"); err != nil {

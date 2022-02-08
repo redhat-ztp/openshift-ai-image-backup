@@ -303,8 +303,6 @@ function check_active_deployment {
 }
 
 function restore_images_and_files {
-    local REBOOT_REQUIRED="no"
-
     display_current_status
 
     #
@@ -354,15 +352,6 @@ function restore_images_and_files {
     echo "##### $(date -u): Completed restoring /var/lib/kubelet content"
 
     #
-    # Check for /etc changes requiring a reboot
-    #
-    rsync --out-format="%n" -ac --delete --no-t --exclude-from ${BACKUP_DIR}/etc.exclude.list ${BACKUP_DIR}/etc/ /etc/ \
-        | grep -q -e '^NetworkManager'
-    if [ $? -eq 0 ]; then
-        REBOOT_REQUIRED="yes"
-    fi
-
-    #
     # Restore /etc content
     #
     echo "##### $(date -u): Restoring /etc content"
@@ -395,10 +384,8 @@ function restore_images_and_files {
 
     record_progress "restore_images_and_files"
 
-    if [ "${REBOOT_REQUIRED}" = "yes" ]; then
-        echo "Some files restored require a reboot. Please reboot now, then use ${PROG} --resume option" >&2
-        exit 0
-    fi
+    echo "Please reboot now with 'systemctl reboot', then run '${PROG} --resume'" >&2
+    exit 0
 }
 
 function restore_cluster {
