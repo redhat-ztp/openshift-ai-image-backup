@@ -71,7 +71,7 @@ func LaunchBackup(BackupPath string) error {
 	}
 
 	if err := os.Chdir("/"); err != nil {
-		log.Error("Couldn't do chdir)")
+		log.Error("Couldn't do chdir")
 		return err
 	}
 
