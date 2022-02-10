@@ -26,12 +26,9 @@ Options:
 
 Backup options:
     --take-backup:  Take backup
-    --skip-images:  Skip backup of container images
 
 Recovery options:
     --force:        Skip ostree deployment check
-    --skip-images:  Skip restore of container images
-    --skip-wipe:    Skip crio wipe step
     --step:         Step through recovery stages
     --resume:       Resume recovery after last successful stage
     --restart:      Restart recovery from first stage
@@ -180,14 +177,7 @@ function take_backup {
         exit 1
     fi
 
-    echo "##### $(date -u): Backing up container images, cluster, and required files"
-
-    if [ "${SKIP_IMAGES}" = "no" ]; then
-        time for id in $(crictl images -o json | jq -r '.images[].id'); do
-            mkdir -p ${BACKUP_DIR}/containers/$id
-            /usr/bin/skopeo copy --all --insecure-policy containers-storage:$id dir:${BACKUP_DIR}/containers/$id
-        done
-    fi
+    echo "##### $(date -u): Backing up container cluster and required files"
 
     /usr/local/bin/cluster-backup.sh ${BACKUP_DIR}/cluster
     if [ $? -ne 0 ]; then
@@ -257,32 +247,19 @@ function check_active_deployment {
     fi
 }
 
-function restore_images_and_files {
+function restore_files {
     display_current_status
 
     #
     # Wipe current containers by shutting down kubelet, deleting containers and pods,
     # then stopping and wiping crio
     #
-    if [ "${SKIP_WIPE}" = "no" ]; then
-        echo "##### $(date -u): Wiping existing containers"
-        systemctl stop kubelet.service
-        crictl rmp -fa
-        systemctl stop crio.service
-        crio wipe -f
-        echo "##### $(date -u): Completed wipe"
-    fi
-
-    #
-    # Restore container images
-    #
-    if [ "${SKIP_IMAGES}" = "no" ]; then
-        echo "##### $(date -u): Restoring container images"
-        time for id in $(find ${BACKUP_DIR}/containers -mindepth 1 -maxdepth 2 -type d); do
-            /usr/bin/skopeo copy dir:$id containers-storage:local/$(basename $id)
-        done
-        echo "##### $(date -u): Completed restoring container images"
-    fi
+    echo "##### $(date -u): Wiping existing containers"
+    systemctl stop kubelet.service
+    crictl rmp -fa
+    systemctl stop crio.service
+    crio wipe -f
+    echo "##### $(date -u): Completed wipe"
 
     #
     # Restore /usr/local content
@@ -337,7 +314,7 @@ function restore_images_and_files {
     systemctl daemon-reload
     systemctl disable kubelet.service
 
-    record_progress "restore_images_and_files"
+    record_progress "restore_files"
 
     echo "Please reboot now with 'systemctl reboot', then run '${PROG} --resume'" >&2
     exit 0
@@ -375,10 +352,8 @@ function restore_cluster {
     time systemctl restart kubelet.service
     systemctl enable kubelet.service
 
-    if [ "${SKIP_WIPE}" = "yes" ]; then
-        echo "##### $(date -u): Restarting crio.service"
-        time systemctl restart crio.service
-    fi
+    echo "##### $(date -u): Restarting crio.service"
+    time systemctl restart crio.service
 
     #
     # Wait for containers to launch or restart after cluster restore
@@ -421,13 +396,11 @@ declare BACKUP_DIR="/var/recovery"
 declare RESTART_TIMEOUT=1200 # 20 minutes
 declare REDEPLOYMENT_TIMEOUT=1200 # 20 minutes
 declare SKIP_DEPLOY_CHECK="no"
-declare SKIP_IMAGES="no"
-declare SKIP_WIPE="no"
 declare TAKE_BACKUP="no"
 declare STEPTHROUGH="no"
 declare RESUME="no"
 
-LONGOPTS="dir:,force,restart,resume,skip-images,skip-wipe,step,take-backup"
+LONGOPTS="dir:,force,restart,resume,step,take-backup"
 OPTS=$(getopt -o h --long "${LONGOPTS}" --name "$0" -- "$@")
 
 if [ $? -ne 0 ]; then
@@ -453,15 +426,6 @@ while :; do
             ;;
         --resume)
             RESUME="yes"
-            shift
-            ;;
-        --skip-images)
-            SKIP_IMAGES="yes"
-            SKIP_WIPE="yes"
-            shift
-            ;;
-        --skip-wipe)
-            SKIP_WIPE="yes"
             shift
             ;;
         --step)
@@ -536,8 +500,8 @@ fi
 
 record_progress "started"
 
-if ! check_progress "restore_images_and_files"; then
-    restore_images_and_files
+if ! check_progress "restore_files"; then
+    restore_files
 
     if [ "${STEPTHROUGH}" = "yes" ]; then
         echo "##### $(date -u): Stage complete. Use --step option to resume."
