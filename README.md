@@ -162,3 +162,38 @@ spec:
                 name: backup
 
 ```
+
+## Recovery from Upgrade Failure
+### Platform Rollback
+Platform rollback, if needed, is handled by issuing the `rpm-ostree rollback -r` command. Not all upgrades will include an update to the platform OS, however, so this step will not always be required.
+
+When the backup was taken, the active deployment was pinned and standby deployments removed. Use the `ostree admin status` command to see the current state.
+
+|Deployment Status|Rollback Action|
+|-----------------|---------------|
+|Single deployment, pinned|Platform OS unchanged, no action required|
+|Standby deployment pinned, flagged as "rollback"|Trigger rollback with `rpm-ostree rollback -r` command|
+|Multiple standby deployments, pinned deployment is not "rollback"|1. Delete unpinned standby deployments with `ostree admin undeploy 1`, until pinned deployment is "rollback".<br>2. Trigger rollback with `rpm-ostree rollback -r` command|
+
+### Recovery Utility
+The upgrade recovery utility is generated when taking the backup, before the upgrade starts, written as `/var/recovery/upgrade-recovery.sh`.
+
+The first phase of the recovery will run the following steps, and then stop to allow the user to reboot the node:
+* Shut down `crio.service` and `kubelet.service`, wiping existing containers
+* Restore files from the backup to `/etc`, `/usr/local`, and `/var/lib/kubelet`
+* Restore any additional machine-config managed files from the backup, if applicable
+* Disable `kubelet.service `to prevent it from automatically starting after the reboot
+
+Reboot the node when prompted, with `systemctl reboot`.
+
+The second phase of the recovery can be run after the reboot, with the `--resume` option:<br>
+`/var/recovery/upgrade-recovery.sh --resume`
+
+This phase will do the following:
+* Restore the etcd cluster, waiting for required containers to restart
+* Re-enable kubelet.service, so that it launches automatically on subsequent reboots
+* Redeploy etcd, kubeapiserver, kubecontrollermanager, and kubescheduler, waiting for successful redeployment of each, per cluster restore procedure documented at:<br>
+https://docs.openshift.com/container-platform/4.9/backup_and_restore/control_plane_backup_and_restore/disaster_recovery/scenario-2-restoring-cluster-state.html
+
+Should the recovery utility fail, the user can retry with the `--restart` option:<br>
+`/var/recovery/upgrade-recovery.sh --restart`
