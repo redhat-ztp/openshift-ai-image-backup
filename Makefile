@@ -42,7 +42,7 @@ push-image: build-image
 
 .PHONY: build
 
-check: | verify golangci-lint shell-check
+check: | verify golangci-lint check-shellcheck check-bashate
 .PHONY: check
 
 golangci-lint:
@@ -50,12 +50,25 @@ golangci-lint:
 .PHONY: golangci-lint
 
 ifeq ($(shell which shellcheck 2>/dev/null),)
-shell-check:
+check-shellcheck:
 	@echo "Skipping shellcheck: Not installed"
 else
-shell-check:
-	find . -name '*.sh' -not -path './vendor/*' -not -path './git/*' -print0 | xargs -0 --no-run-if-empty shellcheck
+check-shellcheck:
+	find . -name '*.sh' -not -path './vendor/*' -not -path './git/*' -print0 \
+		| xargs -0 --no-run-if-empty shellcheck
 endif
-.PHONY: shell-check
+.PHONY: check-shellcheck
+
+ifeq ($(shell which bashate 2>/dev/null),)
+check-bashate:
+	@echo "Skipping bashate: Not installed"
+else
+# Ignored bashate errors/warnings:
+#   E006 Line too long
+check-bashate:
+	find . -name '*.sh' -not -path './vendor/*' -not -path './git/*' -print0 \
+		| xargs -0 --no-run-if-empty bashate -e 'E*' -i E006
+endif
+.PHONY: check-bashate
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
