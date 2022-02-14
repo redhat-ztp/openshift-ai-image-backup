@@ -42,7 +42,7 @@ push-image: build-image
 
 .PHONY: build
 
-check: | verify golangci-lint check-shellcheck check-bashate
+check: | verify golangci-lint check-shellcheck check-bashate check-markdownlint
 .PHONY: check
 
 golangci-lint:
@@ -70,5 +70,15 @@ check-bashate:
 		| xargs -0 --no-run-if-empty bashate -e 'E*' -i E006
 endif
 .PHONY: check-bashate
+
+ifeq ($(shell which markdownlint 2>/dev/null),)
+check-markdownlint:
+	@echo "Skipping markdownlint: Not installed"
+else
+check-markdownlint:
+	find . -name '*.md' -not -path './vendor/*' -not -path './git/*' -print0 \
+		| xargs -0 --no-run-if-empty markdownlint
+endif
+.PHONY: check-markdownlint
 
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
