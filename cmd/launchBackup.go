@@ -47,14 +47,19 @@ func RecoveryInProgress(BackupPath string) bool {
 	return true
 }
 
+func ParseBackupPath(BackupPath string) string {
+	if check := strings.Contains(BackupPath[len(BackupPath)-1:], "/"); check {
+		BackupPath = BackupPath[:len(BackupPath)-1]
+	}
+	return BackupPath
+}
+
 //LaunchBackup triggers the backup procedure
 // returns:			error
 func LaunchBackup(BackupPath string) error {
 
-	// check for back slash in the BackupPath
-	if check := strings.Contains(BackupPath[len(BackupPath)-1:], "/"); check {
-		BackupPath = BackupPath[:len(BackupPath)-1]
-	}
+	// check for slash in the BackupPath
+	BackupPath = ParseBackupPath(BackupPath)
 
 	//change root directory to /host
 	if err := syscall.Chroot(host); err != nil {
@@ -109,13 +114,13 @@ func LaunchBackup(BackupPath string) error {
 	}
 
 	log.Info(strings.Repeat("-", 60))
-	log.Info("backup has succesfully finished ...")
+	log.Info("backup has successfully finished ...")
 
 	return nil
 
 }
 
-// Cleanup deletes all old sub diectories and files in the recovery partition
+// Cleanup deletes all old subdirectories and files in the recovery partition
 // returns: 			error
 func Cleanup(path string) error {
 	log.Info(strings.Repeat("-", 60))
